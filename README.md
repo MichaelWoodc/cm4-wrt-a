@@ -34,6 +34,7 @@ echo \
   sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
 sudo apt-get update
 sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+sudo usermod -aG docker ${USER}
 ```
 ## Building OpenWrt (with picod included) ##
 It will be possible to update this OpenWrt build by adding kmods and packages from the official repository using <b>opkg</b>, or <b>LuCI</b> software interface.
