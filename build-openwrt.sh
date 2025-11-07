@@ -5,13 +5,17 @@
 # CM4-WRT-A baseboard: 
 # https://www.tindie.com/products/mytechcatalog/rpi-cm4-router-baseboard-with-nvme/
 ################################################################################
+
 git_url="https://git.openwrt.org/openwrt/openwrt.git"
-[ "x$1" == "x" ] && { branch=$(git ls-remote --tags ${git_url} 'refs/tags/v*' |\
-grep '[^\{\}]$' | tail -n 1 | awk '{print $2}' | cut -d'/' -f3); } ||\
-{ branch="$1"; }
+
+# If no branch is passed, get the latest tag
+[ "x$1" == "x" ] && { branch=$(git ls-remote --tags ${git_url} 'refs/tags/v*' | grep '[^\{\}]$' | tail -n 1 | awk '{print $2}' | cut -d'/' -f3); } || { branch="$1"; }
+
 echo -e "Using OpenWrt: \033[1;36m${branch}\033[0m"
+
 CONTAINER_NAME=openwrt-build
 imageName="openwrt:${branch}"
+
 # $0 always points to the shell script name.
 scripDir=$(dirname "$0") 
 basePath=$(realpath "${scripDir}");
@@ -21,51 +25,56 @@ dockerFile=${basePath}/OpenWrtDockerfile
 
 cfgUrl="https://downloads.openwrt.org/releases/${branch#v*}/targets/bcm27xx/bcm2711/config.buildinfo"
 
-theId=`docker ps -aqf "name=^${CONTAINER_NAME}$"`;
+theId=$(docker ps -aqf "name=^${CONTAINER_NAME}$")
 
-[ -z ${theId} ] && {
-  printf "#This file is auto-generated.\nFROM debian:bookworm-slim\n\n" > ${dockerFile};
-  printf "RUN useradd build -u $(id -u) -m -c 'OpenWrt Builder'\n" >> ${dockerFile};
-  printf "RUN apt-get update\n" >> ${dockerFile};
-  printf "RUN apt install -y build-essential clang \\\n" >> ${dockerFile};
-  printf "\tflex bison g++ gawk gcc-multilib g++-multilib \\\n" >> ${dockerFile};
-  printf "\tgettext git libncurses5-dev libssl-dev \\\n" >> ${dockerFile};
-  printf "\tpython3-distutils rsync unzip zlib1g-dev file wget ca-certificates\n" >> ${dockerFile};
-  printf "USER build\n" >> ${dockerFile};
-  printf "RUN mkdir ~/openwrt ~/picod\n" >> ${dockerFile};
-  printf "WORKDIR /home/build/openwrt\n" >> ${dockerFile};
+[ -z "${theId}" ] && {
+  printf "#This file is auto-generated.\nFROM debian:bookworm-slim\n\n" > ${dockerFile}
+  printf "RUN useradd build -u $(id -u) -m -c 'OpenWrt Builder'\n" >> ${dockerFile}
+  printf "RUN apt-get update && \\\n" >> ${dockerFile}
+
+  {
+    printf "    apt-get install -y build-essential clang \\\n"
+    printf "    flex bison g++ gawk gcc-multilib g++-multilib \\\n"
+    printf "    gettext git libncurses5-dev libssl-dev \\\n"
+    printf "    python3-distutils rsync unzip zlib1g-dev file wget ca-certificates\n"
+  } >> ${dockerFile}
+
+  printf "USER build\n" >> ${dockerFile}
+  printf "RUN mkdir ~/openwrt ~/picod\n" >> ${dockerFile}
+  printf "WORKDIR /home/build/openwrt\n" >> ${dockerFile}
 
   # ---- Git reliability improvements ----
-  printf "RUN git config --global http.postBuffer 524288000\n" >> ${dockerFile};
-  printf "RUN git config --global http.maxRequests 10\n" >> ${dockerFile};
-  printf "RUN git clone --depth 1 -b ${branch} ${git_url} . || (sleep 10 && git clone --depth 1 -b ${branch} ${git_url} .)\n" >> ${dockerFile};
+  printf "RUN git config --global http.postBuffer 524288000\n" >> ${dockerFile}
+  printf "RUN git config --global http.maxRequests 10\n" >> ${dockerFile}
+  printf "RUN git clone --depth 1 -b ${branch} ${git_url} . || (sleep 10 && git clone --depth 1 -b ${branch} ${git_url} .)\n" >> ${dockerFile}
   # --------------------------------------
 
-  printf "RUN make distclean\n" >> ${dockerFile};
-  printf "RUN ./scripts/feeds update -a\n" >> ${dockerFile};
-  printf "RUN ./scripts/feeds install -a\n" >> ${dockerFile};
-  printf "RUN echo '/home/build/CM4/create_picod_links.sh' > ~/build-openwrt.sh\n" >> ${dockerFile};
-  printf "RUN echo 'cp -r /home/build/CM4/package /home/build/openwrt/' >> ~/build-openwrt.sh\n" >> ${dockerFile};
-  printf "RUN wget --output-document=/home/build/openwrt/.config ${cfgUrl}\n" >> ${dockerFile};
-  printf "RUN echo 'cat /home/build/CM4/diffconfig >> /home/build/openwrt/.config' >> ~/build-openwrt.sh\n" >> ${dockerFile};
-  printf "RUN echo 'make defconfig && make tools/install -j\$(nproc) && make toolchain/install -j\$(nproc)' >> ~/build-openwrt.sh\n" >> ${dockerFile};
-  printf "RUN echo 'cp /home/build/CM4/config.txt ./target/linux/bcm27xx/image/config.txt' >> ~/build-openwrt.sh\n" >> ${dockerFile};
-  printf "RUN echo 'make -j\$(nproc) defconfig download clean world' >> ~/build-openwrt.sh\n" >> ${dockerFile};
-  printf "RUN chmod +x ~/build-openwrt.sh\n" >> ${dockerFile};
+  printf "RUN make distclean\n" >> ${dockerFile}
+  printf "RUN ./scripts/feeds update -a\n" >> ${dockerFile}
+  printf "RUN ./scripts/feeds install -a\n" >> ${dockerFile}
+
+  printf "RUN echo '/home/build/CM4/create_picod_links.sh' > ~/build-openwrt.sh\n" >> ${dockerFile}
+  printf "RUN echo 'cp -r /home/build/CM4/package /home/build/openwrt/' >> ~/build-openwrt.sh\n" >> ${dockerFile}
+  printf "RUN wget --output-document=/home/build/openwrt/.config ${cfgUrl}\n" >> ${dockerFile}
+  printf "RUN echo 'cat /home/build/CM4/diffconfig >> /home/build/openwrt/.config' >> ~/build-openwrt.sh\n" >> ${dockerFile}
+  printf "RUN echo 'make defconfig && make tools/install -j\$(nproc) && make toolchain/install -j\$(nproc)' >> ~/build-openwrt.sh\n" >> ${dockerFile}
+  printf "RUN echo 'cp /home/build/CM4/config.txt ./target/linux/bcm27xx/image/config.txt' >> ~/build-openwrt.sh\n" >> ${dockerFile}
+  printf "RUN echo 'make -j\$(nproc) defconfig download clean world' >> ~/build-openwrt.sh\n" >> ${dockerFile}
+  printf "RUN chmod +x ~/build-openwrt.sh\n" >> ${dockerFile}
 }
 
-docker build ${basePath}/ -f ${dockerFile} -t ${imageName} &&\
+docker build ${basePath}/ -f ${dockerFile} -t ${imageName} && \
 docker run -t -d --name ${CONTAINER_NAME} \
     -v "${basePath}"/CM4/:/home/build/CM4 \
     -v "${basePath}"/pico/:/home/build/pico:ro \
-    -v "${basePath}"/bin/:/home/build/openwrt/bin ${imageName} &&\
+    -v "${basePath}"/bin/:/home/build/openwrt/bin ${imageName} && \
 docker exec -it ${CONTAINER_NAME} bash -c "/home/build/build-openwrt.sh"; exit 0;
 
-[ "$( docker container inspect -f '{{.State.Running}}' ${CONTAINER_NAME} )" == "true" ] &&\
+[ "$(docker container inspect -f '{{.State.Running}}' ${CONTAINER_NAME})" == "true" ] && \
 { docker exec -it ${CONTAINER_NAME} bash; exit 0; }
 
-[ "$( docker container inspect -f '{{.State.Running}}' ${CONTAINER_NAME} )" == "false" ] &&\
-{ echo -e "Starting \033[1;36m${CONTAINER_NAME}\033[0m" && docker start ${CONTAINER_NAME}; } &&\
+[ "$(docker container inspect -f '{{.State.Running}}' ${CONTAINER_NAME})" == "false" ] && \
+{ echo -e "Starting \033[1;36m${CONTAINER_NAME}\033[0m" && docker start ${CONTAINER_NAME}; } && \
 { docker exec -it ${CONTAINER_NAME} bash; exit 0; }
 
 # Later on within the Docker container, you can rebuild the picod package
