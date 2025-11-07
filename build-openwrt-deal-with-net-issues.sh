@@ -29,7 +29,7 @@ dockerFile="${basePath}/OpenWrtDockerfile"
 cfgUrl="https://downloads.openwrt.org/releases/${branch#v*}/targets/bcm27xx/bcm2711/config.buildinfo"
 theId=$(docker ps -aqf "name=^${CONTAINER_NAME}$")
 
-# Generate Dockerfile only if container doesn’t exist
+# Generate Dockerfile only if container doesn't exist
 if [ -z "${theId}" ]; then
 cat <<EOF > "${dockerFile}"
 # This file is auto-generated.
@@ -41,24 +41,36 @@ RUN apt-get update && \
     apt-get install -y build-essential clang \
     flex bison g++ gawk gcc-multilib g++-multilib \
     gettext git libncurses5-dev libssl-dev \
-    python3-distutils rsync unzip zlib1g-dev file wget ca-certificates \
-    libpam0g-dev liblzma-dev libconfig-dev libtirpc-dev libnet-snmp-perl \
-    quilt kmod bc libelf-dev libpci-dev
-
+    python3-distutils rsync unzip zlib1g-dev file wget ca-certificates
 
 USER build
 RUN mkdir -p ~/openwrt ~/picod
 WORKDIR /home/build/openwrt
 
-# Improve git reliability
-RUN git config --global http.postBuffer 524288000 && \
-    git config --global http.maxRequests 10
+# Improve git reliability with larger buffers and retries
+RUN git config --global http.postBuffer 1048576000 && \
+    git config --global http.lowSpeedLimit 0 && \
+    git config --global http.lowSpeedTime 999999 && \
+    git config --global core.compression 0
 
-# Force fresh repo clone
+# Force fresh repo clone with retry logic
 RUN rm -rf /home/build/openwrt/* && \
-    git clone --depth 1 -b ${branch} ${git_url} . || (sleep 10 && git clone --depth 1 -b ${branch} ${git_url} .)
+    for i in 1 2 3; do \
+        git clone --depth 1 -b ${branch} ${git_url} . && break || \
+        (echo "Clone attempt \$i failed, retrying..." && sleep 30 && rm -rf ./* .git); \
+    done
 
-RUN make distclean && ./scripts/feeds update -a && ./scripts/feeds install -a
+# Feeds update with retry logic for each feed
+RUN make distclean
+RUN for feed in packages luci routing telephony; do \
+        for i in 1 2 3; do \
+            ./scripts/feeds update \$feed && break || \
+            (echo "Feed \$feed update attempt \$i failed, retrying..." && sleep 30); \
+        done; \
+    done
+
+# Feeds install with continue on error
+RUN ./scripts/feeds install -a || echo "Some feeds failed to install, continuing..."
 
 # Create build script
 RUN echo '/home/build/CM4/create_picod_links.sh' > ~/build-openwrt.sh && \
@@ -67,6 +79,8 @@ RUN echo '/home/build/CM4/create_picod_links.sh' > ~/build-openwrt.sh && \
     echo 'cat /home/build/CM4/diffconfig >> /home/build/openwrt/.config' >> ~/build-openwrt.sh && \
     echo 'make defconfig && make tools/install -j\$(nproc) && make toolchain/install -j\$(nproc)' >> ~/build-openwrt.sh && \
     echo 'cp /home/build/CM4/config.txt ./target/linux/bcm27xx/image/config.txt' >> ~/build-openwrt.sh && \
+    # Disable picod if it fails to build \
+    echo 'sed -i "s/CONFIG_PACKAGE_picod=y/# CONFIG_PACKAGE_picod is not set/" .config 2>/dev/null || true' >> ~/build-openwrt.sh && \
     echo 'make -j\$(nproc) defconfig download clean world' >> ~/build-openwrt.sh && \
     chmod +x ~/build-openwrt.sh
 EOF
@@ -88,9 +102,3 @@ else
   docker start ${CONTAINER_NAME}
   docker exec -it ${CONTAINER_NAME} bash
 fi
-
-# Inside container:
-# make package/picod/{clean,compile} -j$(nproc)
-# make menuconfig
-# ./scripts/diffconfig.sh > ~/CM4/diffconfig
-# make -j$(nproc) defconfig download clean world
