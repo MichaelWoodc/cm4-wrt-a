@@ -62,7 +62,7 @@ RUN rm -rf /home/build/openwrt/* && \
 
 # Feeds update with retry logic for each feed
 RUN make distclean
-RUN for feed in packages luci routing telephony; do \
+RUN for feed in packages luci routing; do \
         for i in 1 2 3; do \
             ./scripts/feeds update \$feed && break || \
             (echo "Feed \$feed update attempt \$i failed, retrying..." && sleep 30); \

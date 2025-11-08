@@ -30,7 +30,8 @@ cfgUrl="https://downloads.openwrt.org/releases/${branch#v*}/targets/bcm27xx/bcm2
 theId=$(docker ps -aqf "name=^${CONTAINER_NAME}$")
 
 # Generate Dockerfile only if container doesn’t exist
-if [ -z "${theId}" ]; then
+## Edit! Always regenerate Dockerfile to pick up changes. Comment out below line
+# if [ -z "${theId}" ]; then
 cat <<EOF > "${dockerFile}"
 # This file is auto-generated.
 FROM debian:bookworm-slim
