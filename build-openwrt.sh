@@ -57,10 +57,8 @@ RUN rm -rf /home/build/openwrt/* && \
     git clone --depth 1 -b ${branch} ${git_url} . || (sleep 10 && git clone --depth 1 -b ${branch} ${git_url} .)
 
 RUN make distclean && \
-    ./scripts/feeds update packages && \
-    ./scripts/feeds update luci && \
-    ./scripts/feeds update routing && \
-    ./scripts/feeds install -a
+    ./scripts/feeds update packages luci routing && \
+    ./scripts/feeds install -a -p packages -p luci -p routing
 
 # Create build script
 RUN echo '/home/build/CM4/create_picod_links.sh' > ~/build-openwrt.sh && \
