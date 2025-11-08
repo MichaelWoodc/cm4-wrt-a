@@ -29,9 +29,7 @@ dockerFile="${basePath}/OpenWrtDockerfile"
 cfgUrl="https://downloads.openwrt.org/releases/${branch#v*}/targets/bcm27xx/bcm2711/config.buildinfo"
 theId=$(docker ps -aqf "name=^${CONTAINER_NAME}$")
 
-# Generate Dockerfile only if container doesn’t exist
-## Edit! Always regenerate Dockerfile to pick up changes. Comment out below line
-# if [ -z "${theId}" ]; then
+# Always regenerate Dockerfile to pick up changes
 cat <<EOF > "${dockerFile}"
 # This file is auto-generated.
 FROM debian:bookworm-slim
@@ -45,7 +43,6 @@ RUN apt-get update && \
     python3-distutils rsync unzip zlib1g-dev file wget ca-certificates \
     libpam0g-dev liblzma-dev libconfig-dev libtirpc-dev libnet-snmp-perl \
     quilt kmod bc libelf-dev libpci-dev
-
 
 USER build
 RUN mkdir -p ~/openwrt ~/picod
@@ -71,7 +68,6 @@ RUN echo '/home/build/CM4/create_picod_links.sh' > ~/build-openwrt.sh && \
     echo 'make -j\$(nproc) defconfig download clean world' >> ~/build-openwrt.sh && \
     chmod +x ~/build-openwrt.sh
 EOF
-fi
 
 # Build image and run container
 docker build "${basePath}" -f "${dockerFile}" -t "${imageName}"
