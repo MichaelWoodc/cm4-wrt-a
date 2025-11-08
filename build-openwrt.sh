@@ -56,7 +56,11 @@ RUN git config --global http.postBuffer 524288000 && \
 RUN rm -rf /home/build/openwrt/* && \
     git clone --depth 1 -b ${branch} ${git_url} . || (sleep 10 && git clone --depth 1 -b ${branch} ${git_url} .)
 
-RUN make distclean && ./scripts/feeds update -a && ./scripts/feeds install -a
+RUN make distclean && \
+    ./scripts/feeds update packages && \
+    ./scripts/feeds update luci && \
+    ./scripts/feeds update routing && \
+    ./scripts/feeds install -a
 
 # Create build script
 RUN echo '/home/build/CM4/create_picod_links.sh' > ~/build-openwrt.sh && \
