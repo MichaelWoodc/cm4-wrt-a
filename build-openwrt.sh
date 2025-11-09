@@ -36,6 +36,8 @@ theId=`docker ps -aqf "name=^${CONTAINER_NAME}$"`;
 { printf "RUN git clone https://github.com/AlvinEmo/patches-for-dahdi-linux.git /home/build/patches-for-dahdi-linux\n" >> ${dockerFile}; } &&\
 { printf "RUN mkdir -p feeds/telephony/libs/dahdi-linux/patches\n" >> ${dockerFile}; } &&\
 { printf "RUN cp /home/build/patches-for-dahdi-linux/*.patch feeds/telephony/libs/dahdi-linux/patches/\n" >> ${dockerFile}; } &&\
+{ printf "RUN mkdir -p feeds/telephony/dahdi-linux/patches\n" >> ${dockerFile}; } &&\
+{ printf "RUN cp /home/build/patches-for-dahdi-linux/*.patch feeds/telephony/dahdi-linux/patches/\n" >> ${dockerFile}; } &&\
 { printf "RUN make distclean \n" >> ${dockerFile}; } &&\
 { printf "RUN ./scripts/feeds update -a\n" >> ${dockerFile}; } &&\
 { printf "RUN ./scripts/feeds install -a\n" >> ${dockerFile}; } &&\
