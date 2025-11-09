@@ -48,18 +48,17 @@ theId=`docker ps -aqf "name=^${CONTAINER_NAME}$"`;
 { printf "RUN echo 'make -j\$(nproc) defconfig download clean world' >> ~/build-openwrt.sh\n" >> ${dockerFile}; } &&\
 { printf "RUN chmod +x ~/build-openwrt.sh\n" >> ${dockerFile}; } &&\
 { docker build ${basePath}/ -f ${dockerFile} -t ${imageName}; } &&\
-{ docker run -t -d --name ${CONTAINER_NAME} \
+{ docker run -t --name ${CONTAINER_NAME} \
     -v "${basePath}"/CM4/:/home/build/CM4 \
     -v "${basePath}"/pico/:/home/build/pico:ro \
-    -v "${basePath}"/bin/:/home/build/openwrt/bin ${imageName}; } &&\
-{ docker exec -it ${CONTAINER_NAME} bash -c "/home/build/build-openwrt.sh"; exit 0;}
+    -v "${basePath}"/bin/:/home/build/openwrt/bin ${imageName}; }
 
 [ "$( docker container inspect -f '{{.State.Running}}' ${CONTAINER_NAME} )" == "true" ] &&\
-{ docker exec -it ${CONTAINER_NAME} bash; exit 0; }
+{ docker exec -it ${CONTAINER_NAME} bash; }
 
 [ "$( docker container inspect -f '{{.State.Running}}' ${CONTAINER_NAME} )" == "false" ] &&\
 { echo -e "Starting \033[1;36m${CONTAINER_NAME}\033[0m" && docker start ${CONTAINER_NAME}; } &&\
-{ docker exec -it ${CONTAINER_NAME} bash; exit 0; }
+{ docker exec -it ${CONTAINER_NAME} bash; }
 
 # Later on within the Docker container, you can rebuild the picod package
 #make package/picod/{clean,compile} -j$(nproc)
