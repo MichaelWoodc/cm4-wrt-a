@@ -28,7 +28,7 @@ theId=`docker ps -aqf "name=^${CONTAINER_NAME}$"`;
 { printf "RUN apt install -y build-essential clang \\" >> ${dockerFile}; } &&\
 { printf "\n\tflex bison g++ gawk gcc-multilib g++-multilib \\" >> ${dockerFile}; } &&\
 { printf "\n\tgettext git libncurses5-dev libssl-dev \\" >> ${dockerFile}; } &&\
-{ printf "\n\tpython3-distutils rsync unzip zlib1g-dev file wget\n" >> ${dockerFile}; } &&\
+{ printf "\n\tpython3 python3-venv rsync unzip zlib1g-dev file wget\n" >> ${dockerFile}; } &&\
 { printf "USER build\n" >> ${dockerFile}; } &&\
 { printf "RUN mkdir ~/openwrt ~/picod\n" >> ${dockerFile}; } &&\
 { printf "WORKDIR /home/build/openwrt\n" >> ${dockerFile}; } &&\
