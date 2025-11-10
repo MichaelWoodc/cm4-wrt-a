@@ -6,9 +6,10 @@
 # https://www.tindie.com/products/mytechcatalog/rpi-cm4-router-baseboard-with-nvme/
 ################################################################################
 git_url="https://git.openwrt.org/openwrt/openwrt.git"
-[ "x$1" == "x" ] && { branch=$(git ls-remote --tags ${git_url} 'refs/tags/v*' |\
-grep '[^\{\}]$' | tail -n 1 | awk '{print $2}' | cut -d'/' -f3); } ||\
+[ "x$1" == "x" ] && { branch=$(git ls-remote --tags ${git_url} 'refs/tags/v*' 2>/dev/null |\
+grep -E 'refs/tags/v[0-9]+\.[0-9]+\.[0-9]+$' | cut -d/ -f3 | sort -V | tail -n 1); } ||\
 { branch="$1"; }
+[ -z "$branch" ] && branch="master"
 echo -e "Using OpenWrt: \033[1;36m${branch}\033[0m"
 CONTAINER_NAME=openwrt-build
 imageName="openwrt:${branch}"
@@ -27,26 +28,27 @@ theId=`docker ps -aqf "name=^${CONTAINER_NAME}$"`;
 { printf "RUN apt install -y build-essential clang \\" >> ${dockerFile}; } &&\
 { printf "\n\tflex bison g++ gawk gcc-multilib g++-multilib \\" >> ${dockerFile}; } &&\
 { printf "\n\tgettext git libncurses5-dev libssl-dev \\" >> ${dockerFile}; } &&\
-{ printf "\n\tpython3 python3-venv rsync unzip zlib1g-dev file wget cmake ninja-build quilt\n" >> ${dockerFile}; } &&\
+{ printf "\n\tpython3-distutils python3-pip rsync unzip zlib1g-dev file wget\n" >> ${dockerFile}; } &&\
+{ printf "RUN pip3 install --break-system-packages pyserial\n" >> ${dockerFile}; } &&\
 { printf "USER build\n" >> ${dockerFile}; } &&\
 { printf "RUN mkdir ~/openwrt ~/picod\n" >> ${dockerFile}; } &&\
 { printf "WORKDIR /home/build/openwrt\n" >> ${dockerFile}; } &&\
 { printf "RUN git clone -b ${branch} ${git_url} .\n" >> ${dockerFile}; } &&\
+{ printf "RUN make distclean\n" >> ${dockerFile}; } &&\
+{ printf "RUN ./scripts/feeds update -a\n" >> ${dockerFile}; } &&\
+{ printf "RUN ./scripts/feeds install -a\n" >> ${dockerFile}; } &&\
 { printf "RUN git clone https://github.com/AlvinEmo/patches-for-dahdi-linux.git /home/build/patches-for-dahdi-linux\n" >> ${dockerFile}; } &&\
 { printf "RUN mkdir -p feeds/telephony/libs/dahdi-linux/patches\n" >> ${dockerFile}; } &&\
 { printf "RUN mkdir -p feeds/telephony/dahdi-linux/patches\n" >> ${dockerFile}; } &&\
 { printf "RUN find /home/build/patches-for-dahdi-linux -name '*.patch' -exec cp {} feeds/telephony/libs/dahdi-linux/patches/ \\;\n" >> ${dockerFile}; } &&\
 { printf "RUN find /home/build/patches-for-dahdi-linux -name '*.patch' -exec cp {} feeds/telephony/dahdi-linux/patches/ \\;\n" >> ${dockerFile}; } &&\
-{ printf "RUN make distclean\n" >> ${dockerFile}; } &&\
-{ printf "RUN ./scripts/feeds update -a\n" >> ${dockerFile}; } &&\
-{ printf "RUN ./scripts/feeds install -a\n" >> ${dockerFile}; } &&\
 { printf "RUN echo '/home/build/CM4/create_picod_links.sh' > ~/build-openwrt.sh\n" >> ${dockerFile}; } &&\
 { printf "RUN echo 'cp -r /home/build/CM4/package /home/build/openwrt/' >> ~/build-openwrt.sh\n" >> ${dockerFile}; } &&\
 { printf "RUN wget --output-document=/home/build/openwrt/.config ${cfgUrl}\n" >> ${dockerFile}; } &&\
 { printf "RUN echo 'cat /home/build/CM4/diffconfig >> /home/build/openwrt/.config' >> ~/build-openwrt.sh\n" >> ${dockerFile}; } &&\
-{ printf "RUN echo 'make defconfig V=s && make tools/install -j\$(nproc) V=s && make toolchain/install -j\$(nproc) V=s' >> ~/build-openwrt.sh\n" >> ${dockerFile}; } &&\
+{ printf "RUN echo 'make defconfig && make tools/install -j\$(nproc) && make toolchain/install -j\$(nproc)' >> ~/build-openwrt.sh\n" >> ${dockerFile}; } &&\
 { printf "RUN echo 'cp /home/build/CM4/config.txt ./target/linux/bcm27xx/image/config.txt' >> ~/build-openwrt.sh\n" >> ${dockerFile}; } &&\
-{ printf "RUN echo 'make -j\$(nproc) defconfig download clean world V=s' >> ~/build-openwrt.sh\n" >> ${dockerFile}; } &&\
+{ printf "RUN echo 'make -j\$(nproc) defconfig download clean world' >> ~/build-openwrt.sh\n" >> ${dockerFile}; } &&\
 { printf "RUN chmod +x ~/build-openwrt.sh\n" >> ${dockerFile}; } &&\
 { docker build ${basePath}/ -f ${dockerFile} -t ${imageName}; } &&\
 { docker run -t -d --name ${CONTAINER_NAME} \
