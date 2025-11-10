@@ -12,7 +12,6 @@ grep '[^\{\}]$' | tail -n 1 | awk '{print $2}' | cut -d'/' -f3); } ||\
 echo -e "Using OpenWrt: \033[1;36m${branch}\033[0m"
 CONTAINER_NAME=openwrt-build
 imageName="openwrt:${branch}"
-# $0 always point to the shell script name.
 scripDir=$(dirname "$0") 
 basePath=$(realpath "${scripDir}");
 dockerFile=${basePath}/OpenWrtDockerfile
@@ -28,15 +27,15 @@ theId=`docker ps -aqf "name=^${CONTAINER_NAME}$"`;
 { printf "RUN apt install -y build-essential clang \\" >> ${dockerFile}; } &&\
 { printf "\n\tflex bison g++ gawk gcc-multilib g++-multilib \\" >> ${dockerFile}; } &&\
 { printf "\n\tgettext git libncurses5-dev libssl-dev \\" >> ${dockerFile}; } &&\
-{ printf "\n\tpython3 python3-venv rsync unzip zlib1g-dev file wget\n" >> ${dockerFile}; } &&\
+{ printf "\n\tpython3 python3-venv rsync unzip zlib1g-dev file wget cmake ninja-build\n" >> ${dockerFile}; } &&\
 { printf "USER build\n" >> ${dockerFile}; } &&\
 { printf "RUN mkdir ~/openwrt ~/picod\n" >> ${dockerFile}; } &&\
 { printf "WORKDIR /home/build/openwrt\n" >> ${dockerFile}; } &&\
 { printf "RUN git clone -b ${branch} ${git_url} .\n" >> ${dockerFile}; } &&\
 { printf "RUN git clone https://github.com/AlvinEmo/patches-for-dahdi-linux.git /home/build/patches-for-dahdi-linux\n" >> ${dockerFile}; } &&\
 { printf "RUN mkdir -p feeds/telephony/libs/dahdi-linux/patches\n" >> ${dockerFile}; } &&\
-{ printf "RUN cp /home/build/patches-for-dahdi-linux/*.patch feeds/telephony/libs/dahdi-linux/patches/\n" >> ${dockerFile}; } &&\
 { printf "RUN mkdir -p feeds/telephony/dahdi-linux/patches\n" >> ${dockerFile}; } &&\
+{ printf "RUN cp /home/build/patches-for-dahdi-linux/*.patch feeds/telephony/libs/dahdi-linux/patches/\n" >> ${dockerFile}; } &&\
 { printf "RUN cp /home/build/patches-for-dahdi-linux/*.patch feeds/telephony/dahdi-linux/patches/\n" >> ${dockerFile}; } &&\
 { printf "RUN make distclean \n" >> ${dockerFile}; } &&\
 { printf "RUN ./scripts/feeds update -a\n" >> ${dockerFile}; } &&\
