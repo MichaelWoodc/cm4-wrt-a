@@ -5,23 +5,38 @@
 # CM4-WRT-A baseboard: 
 # https://www.tindie.com/products/mytechcatalog/rpi-cm4-router-baseboard-with-nvme/
 ################################################################################
-git_url="https://git.openwrt.org/openwrt/openwrt.git"
-[ "x$1" == "x" ] && { branch=$(git ls-remote --tags ${git_url} 'refs/tags/v*' 2>/dev/null |\
-grep -E 'refs/tags/v[0-9]+\.[0-9]+\.[0-9]+$' | cut -d/ -f3 | sort -V | tail -n 1); } ||\
-{ branch="$1"; }
+
+openwrt_git="https://git.openwrt.org/openwrt/openwrt.git"
+github_git="https://github.com/openwrt/openwrt.git"
+
+# Try to get latest tag from OpenWrt Git
+branch=$(git ls-remote --tags ${openwrt_git} 'refs/tags/v*' 2>/dev/null | \
+grep -E 'refs/tags/v[0-9]+\.[0-9]+\.[0-9]+$' | cut -d/ -f3 | sort -V | tail -n 1)
+
+# If OpenWrt Git fails, fallback to GitHub
+if [ -z "$branch" ]; then
+  echo -e "\033[1;33mOpenWrt Git unreachable, falling back to GitHub...\033[0m"
+  git_url="${github_git}"
+  branch=$(git ls-remote --tags ${git_url} 'refs/tags/v*' 2>/dev/null | \
+  grep -E 'refs/tags/v[0-9]+\.[0-9]+\.[0-9]+$' | cut -d/ -f3 | sort -V | tail -n 1)
+else
+  git_url="${openwrt_git}"
+fi
+
 [ -z "$branch" ] && branch="master"
 echo -e "Using OpenWrt: \033[1;36m${branch}\033[0m"
+
 CONTAINER_NAME=openwrt-build
 imageName="openwrt:${branch}"
 scripDir=$(dirname "$0") 
-basePath=$(realpath "${scripDir}");
+basePath=$(realpath "${scripDir}")
 dockerFile=${basePath}/OpenWrtDockerfile
 
 [ ! -d "${basePath}/bin" ] && { mkdir "${basePath}/bin"; }
 
 cfgUrl="https://downloads.openwrt.org/releases/${branch#v*}/targets/bcm27xx/bcm2711/config.buildinfo"
 
-theId=`docker ps -aqf "name=^${CONTAINER_NAME}$"`;
+theId=$(docker ps -aqf "name=^${CONTAINER_NAME}$")
 [ -z ${theId} ] && { printf "#This file is auto-generated.\nFROM debian:bookworm-slim\n\n" > ${dockerFile}; } &&\
 { printf "RUN useradd build -u $(id -u) -m -c 'OpenWrt Builder'\n" >> ${dockerFile}; } &&\
 { printf "RUN apt-get update\n" >> ${dockerFile}; } &&\
